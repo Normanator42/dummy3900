@@ -1,22 +1,47 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from 'react';
+/* global chrome */
 
 function App() {
+  const [age, setAge] = useState('');
+  const [maxHeartRate, setMaxHeartRate] = useState(null);
+
+  const calculateMaxHeartRate = () => {
+    const heartRate = 220 - age;
+    setMaxHeartRate(heartRate);
+  };
+
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
+        <h1>Max Heart Rate Calculator</h1>
+        <p style={{ fontSize: '18px' }}>
+          This calculator helps you determine your maximum heart rate based on your age.
         </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+        <div>
+          <label>
+            Age (years):
+            <input
+              type="number"
+              value={age}
+            />
+          </label>
+        </div>
+        <button
+          onClick={calculateMaxHeartRate}
+          style={{ marginTop: '30px', width: '200px', height: '40px', fontSize: '16px' }}
         >
-          Learn React
-        </a>
+          Calculate
+        </button>
+        {maxHeartRate && (
+          <div>
+            <h2>Max Heart Rate: {maxHeartRate} bpm</h2>
+          </div>
+        )}
+        <div style={{ marginTop: '20px' }}>
+          <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">
+            Visit YouTube
+          </a>
+        </div>
       </header>
     </div>
   );
