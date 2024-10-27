@@ -6,11 +6,5 @@
   "host_permissions": ["*://*/*"],
   "background": {
     "service_worker": "background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": ["http://localhost:3000/*"],
-      "js": ["sourceContent.js"]
-    }
-  ]
+  }
 }

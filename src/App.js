@@ -38,7 +38,7 @@ function App() {
           </div>
         )}
         <div style={{ marginTop: '20px' }}>
-        <a href="https://www.nasa.gov/" target="_blank" rel="noopener noreferrer">
+        <a href="https://www.nasa.gov" target="_blank" rel="noopener noreferrer">
           Visit NASA
         </a>
 
