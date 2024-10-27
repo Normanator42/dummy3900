@@ -34,11 +34,11 @@ db.run(`
 app.post('/log', (req, res) => {
   const activityData = req.body;
 
-  // Log activity data to the terminal
-  console.log('Activity Log Received:', activityData);
-
   // Extract relevant data
   const { eventType, elementTag, elementText = '', url = '', timestamp, scrollY = 0 } = activityData;
+
+  // Log the extracted data
+  console.log('Extracted Activity Data:', { eventType, elementTag, elementText, url, timestamp, scrollY });
 
   // Insert data into SQLite database
   db.run(
@@ -55,6 +55,7 @@ app.post('/log', (req, res) => {
     }
   );
 });
+
 
 // Start the Express server
 app.listen(port, () => {
