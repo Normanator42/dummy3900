@@ -1,71 +1,57 @@
 /* global chrome */
 
-const YOUR_WEBPAGE_URL = 'http://localhost:3000'; // Replace with your webpage URL
-const TRACKED_DOMAIN = 'www.nasa.gov'; // Domain to track
-let trackedTabId = null; // Variable to store the tracked tab ID
-
-// Listen for when a navigation event creates a new tab
-chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
-  chrome.tabs.get(details.sourceTabId, (sourceTab) => {
-    if (chrome.runtime.lastError) {
-      console.error('Error getting source tab:', chrome.runtime.lastError);
-      return;
-    }
-
-    // Check if the source tab is your webpage
-    if (sourceTab.url && sourceTab.url.startsWith(YOUR_WEBPAGE_URL)) {
-      trackedTabId = details.tabId; // Store the tab ID
-
-      // Inject content script into the newly created tab
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: details.tabId },
-          files: ['content.js'],
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            console.error('Script injection failed:', chrome.runtime.lastError);
-          } else {
-            console.log('Content script injected into tab:', details.tabId);
-          }
-        }
-      );
-    }
-  });
-});
-
-// Listen for navigation events in the tracked tab
-chrome.webNavigation.onCommitted.addListener((details) => {
-  if (details.tabId === trackedTabId) {
-    const url = new URL(details.url);
-    if (url.hostname === TRACKED_DOMAIN) {
-      // Re-inject content script into the tab
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: details.tabId },
-          files: ['content.js'],
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            console.error('Script re-injection failed:', chrome.runtime.lastError);
-          } else {
-            console.log('Content script re-injected into tab:', details.tabId);
-          }
-        }
-      );
-    } else {
-      // If navigated away from the tracked domain, stop tracking
-      console.log(`Navigated away from ${TRACKED_DOMAIN}. Stopping tracking on tab ${details.tabId}.`);
-      trackedTabId = null;
-    }
-  }
-});
+const trackedTabs = {}; // Object to store tracked tabs and their domains
 
 // Handle messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'log') {
-    // Your existing code to handle log messages from content.js
-    // Prepare data in the format expected by the server
+  if (message.type === 'openAndTrack') {
+    const url = message.url;
+    const targetOrigin = new URL(url).origin + '/*';
+    const targetDomain = new URL(url).hostname;
+
+    // Request permissions for the target URL
+    chrome.permissions.request(
+      {
+        origins: [targetOrigin]
+      },
+      function(granted) {
+        if (granted) {
+          // Open the new tab
+          chrome.tabs.create({ url: url }, function(tab) {
+            const newTabId = tab.id;
+
+            // Store the tab ID and the domain
+            trackedTabs[newTabId] = {
+              domain: targetDomain,
+            };
+
+            // Inject content script into the new tab
+            chrome.scripting.executeScript(
+              {
+                target: { tabId: newTabId },
+                files: ['content.js'],
+              },
+              () => {
+                if (chrome.runtime.lastError) {
+                  console.error('Script injection failed:', chrome.runtime.lastError);
+                } else {
+                  console.log('Content script injected into tab:', newTabId);
+                }
+              }
+            );
+          });
+        } else {
+          console.warn('Permission not granted for', url);
+        }
+
+        // Send a response back to the content script
+        sendResponse({ status: 'completed' });
+      }
+    );
+
+    return true; // Indicate that sendResponse will be called asynchronously
+  } else if (message.type === 'log') {
+    // Handle log messages from content scripts
     const activityData = {
       eventType: message.data.eventType,
       elementTag: message.data.elementTag || '',
@@ -96,10 +82,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Listen for navigation events in tracked tabs
+chrome.webNavigation.onCommitted.addListener((details) => {
+  const tabId = details.tabId;
+  if (trackedTabs.hasOwnProperty(tabId)) {
+    const url = new URL(details.url);
+    const trackedDomain = trackedTabs[tabId].domain;
+
+    if (url.hostname === trackedDomain) {
+      // Re-inject content script into the tab
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: tabId },
+          files: ['content.js'],
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            console.error('Script re-injection failed:', chrome.runtime.lastError);
+          } else {
+            console.log('Content script re-injected into tab:', tabId);
+          }
+        }
+      );
+    } else {
+      // If navigated away from the tracked domain, stop tracking
+      console.log(`Navigated away from ${trackedDomain}. Stopping tracking on tab ${tabId}.`);
+      delete trackedTabs[tabId];
+    }
+  }
+});
+
 // Clean up when the tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  if (tabId === trackedTabId) {
+  if (trackedTabs.hasOwnProperty(tabId)) {
     console.log(`Tab ${tabId} closed. Stopping tracking.`);
-    trackedTabId = null;
+    delete trackedTabs[tabId];
   }
 });
